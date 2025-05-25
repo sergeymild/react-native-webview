@@ -209,7 +209,7 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
     const sourceResolved = resolveAssetSource(source as ImageSourcePropType);
     const newSource =
       typeof sourceResolved === 'object'
-        ? Object.entries(sourceResolved as WebViewSourceUri).reduce(
+        ? Object.entries(sourceResolved as any).reduce(
             (prev, [currKey, currValue]) => {
               return {
                 ...prev,
@@ -274,11 +274,11 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
         }
         incognito={incognito}
         mediaPlaybackRequiresUserAction={mediaPlaybackRequiresUserAction}
-        newSource={newSource}
+        newSource={newSource as any}
         style={webViewStyles}
         hasOnFileDownload={!!onFileDownload}
         ref={webViewRef}
-        // @ts-expect-error old arch only
+        // @ts-ignore
         source={sourceResolved}
         {...nativeConfig?.props}
       />

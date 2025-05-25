@@ -171,25 +171,26 @@ const WebViewComponent = forwardRef<{}, MacOSWebViewProps>(
     const sourceResolved = resolveAssetSource(source as ImageSourcePropType);
     const newSource =
       typeof sourceResolved === 'object'
+        //@ts-ignore
         ? Object.entries(sourceResolved as WebViewSourceUri).reduce(
-            (prev, [currKey, currValue]) => {
-              return {
-                ...prev,
-                [currKey]:
-                  currKey === 'headers' &&
-                  currValue &&
-                  typeof currValue === 'object'
-                    ? Object.entries(currValue).map(([key, value]) => {
-                        return {
-                          name: key,
-                          value,
-                        };
-                      })
-                    : currValue,
-              };
-            },
-            {}
-          )
+          (prev, [currKey, currValue]) => {
+            return {
+              ...prev,
+              [currKey]:
+                currKey === 'headers' &&
+                currValue &&
+                typeof currValue === 'object'
+                  ? Object.entries(currValue).map(([key, value]) => {
+                    return {
+                      name: key,
+                      value,
+                    };
+                  })
+                  : currValue,
+            };
+          },
+          {}
+        )
         : sourceResolved;
 
     const webView = (
@@ -200,7 +201,7 @@ const WebViewComponent = forwardRef<{}, MacOSWebViewProps>(
         cacheEnabled={cacheEnabled}
         useSharedProcessPool={useSharedProcessPool}
         messagingEnabled={typeof onMessageProp === 'function'}
-        newSource={newSource}
+        newSource={newSource as any}
         onLoadingError={onLoadingError}
         onLoadingFinish={onLoadingFinish}
         onLoadingProgress={onLoadingProgress}
@@ -221,7 +222,7 @@ const WebViewComponent = forwardRef<{}, MacOSWebViewProps>(
         incognito={incognito}
         mediaPlaybackRequiresUserAction={mediaPlaybackRequiresUserAction}
         ref={webViewRef}
-        // @ts-expect-error old arch only
+        //@ts-ignore
         source={sourceResolved}
         style={webViewStyles}
         {...nativeConfig?.props}

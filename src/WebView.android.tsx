@@ -157,7 +157,8 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         goForward: () =>
           webViewRef.current && Commands.goForward(webViewRef.current),
         goBack: () => webViewRef.current && Commands.goBack(webViewRef.current),
-        loadUrl: (url) => webViewRef.current && Commands.loadUrl(webViewRef.current, url),
+        loadUrl: (url: string) =>
+          webViewRef.current && Commands.loadUrl(webViewRef.current, url),
         reload: () => {
           setViewState('LOADING');
           if (webViewRef.current) {
@@ -256,7 +257,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
     const sourceResolved = resolveAssetSource(source as ImageSourcePropType);
     const newSource =
       typeof sourceResolved === 'object'
-        ? Object.entries(sourceResolved as WebViewSourceUri).reduce(
+        ? Object.entries(sourceResolved as any).reduce(
             (prev, [currKey, currValue]) => {
               return {
                 ...prev,
@@ -296,9 +297,9 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         onShouldStartLoadWithRequest={onShouldStartLoadWithRequest}
         ref={webViewRef}
         // TODO: find a better way to type this.
-        // @ts-expect-error source is old arch
+        // @ts-ignore
         source={sourceResolved}
-        newSource={newSource}
+        newSource={newSource as any}
         style={webViewStyles}
         overScrollMode={overScrollMode}
         javaScriptEnabled={javaScriptEnabled}
