@@ -1,10 +1,16 @@
 package com.reactnativecommunity.webview
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
+import android.view.ViewGroup
+import android.view.ViewParent
 import android.webkit.WebView
 import android.widget.FrameLayout
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 /**
  * A [FrameLayout] container to hold the [RNCWebView].
@@ -12,15 +18,58 @@ import android.widget.FrameLayout
  * [com.facebook.react.views.view.ReactViewGroup] clips the canvas.
  * The WebView will then create an empty offscreen surface and NPE.
  */
+@SuppressLint("ClickableViewAccessibility")
 class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(context) {
   init {
     // We make the WebView as transparent on top of the container,
     // and let React Native sets background color for the container.
     webView.setBackgroundColor(Color.TRANSPARENT)
-    addView(webView)
+    val refresh = SwipeRefreshLayout(context)
+    refresh.layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+    refresh.addView(webView)
+    addView(refresh)
+    refresh.setOnRefreshListener { webView.reload() }
+
+    var downX = 0f
+    var downY = 0f
+    val touchSlop = ViewConfiguration.get(webView.context).scaledTouchSlop
+
+    webView.setOnTouchListener { _, event ->
+      when (event.action) {
+        MotionEvent.ACTION_DOWN -> {
+          downX = event.x
+          downY = event.y
+          refresh.isEnabled = true // Assume vertical until proven otherwise
+        }
+
+        MotionEvent.ACTION_MOVE -> {
+          val deltaX = Math.abs(event.x - downX)
+          val deltaY = Math.abs(event.y - downY)
+
+          // If the user is scrolling more horizontally than vertically
+          if (deltaX > touchSlop && deltaX > deltaY) {
+            refresh.isEnabled = false
+          }
+        }
+
+        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+          refresh.isEnabled = true
+        }
+      }
+      false
+    }
   }
 
-  val webView: RNCWebView = getChildAt(0) as RNCWebView
+  val webView: RNCWebView
+    get() {
+      val group = (getChildAt(0) as ViewGroup)
+      if (group.getChildAt(1) !is RNCWebView && group.getChildAt(0) is RNCWebView) {
+        val v = group.getChildAt(0)
+        group.removeViewAt(0)
+        group.addView(v)
+      }
+      return group.getChildAt(1) as RNCWebView
+    }
 
   companion object {
     /**
@@ -33,7 +82,11 @@ class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(con
       // In exceptional cases, such as receiving WebView messaging after the view has been unmounted,
       // the WebView will not have a parent.
       // In this case, we simply return -1 to indicate that it was not found.
-      return (webView.parent as? View)?.id ?: -1
+      var parent = webView.parent as? ViewParent
+      while (parent !is RNCWebViewWrapper && parent != null) {
+        parent = parent?.parent
+      }
+      return (parent as? ViewGroup)?.id ?: -1
     }
   }
 }

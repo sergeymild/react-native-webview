@@ -140,6 +140,8 @@ const WebViewComponent = forwardRef<{}, IOSWebViewProps>(
       () => ({
         goForward: () =>
           webViewRef.current && Commands.goForward(webViewRef.current),
+        loadUrl: (url: string) =>
+          webViewRef.current && Commands.loadUrl(webViewRef.current, url),
         goBack: () => webViewRef.current && Commands.goBack(webViewRef.current),
         reload: () => {
           setViewState('LOADING');

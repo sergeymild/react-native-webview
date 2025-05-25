@@ -130,6 +130,7 @@ RCTAutoInsetsProtocol>
 
 @implementation RNCWebViewImpl
 {
+
 #if !TARGET_OS_OSX
   UIColor * _savedBackgroundColor;
 #else
@@ -280,6 +281,7 @@ RCTAutoInsetsProtocol>
       for(NSDictionary *menuItem in self.menuItems) {
         NSString *menuItemLabel = [RCTConvert NSString:menuItem[@"label"]];
         NSString *menuItemKey = [RCTConvert NSString:menuItem[@"key"]];
+        if (![menuItemKey hasPrefix:@"link:"]) continue;
         NSString *sel = [NSString stringWithFormat:@"%@%@", CUSTOM_SELECTOR, menuItemKey];
         UIMenuItem *item = [[UIMenuItem alloc] initWithTitle: menuItemLabel
                                                       action: NSSelectorFromString(sel)];
@@ -296,6 +298,7 @@ RCTAutoInsetsProtocol>
   for(NSDictionary *menuItem in self.menuItems) {
     NSString *menuItemLabel = [RCTConvert NSString:menuItem[@"label"]];
     NSString *menuItemKey = [RCTConvert NSString:menuItem[@"key"]];
+    if ([menuItemKey hasPrefix:@"link:"]) continue;
     NSString *sel = [NSString stringWithFormat:@"%@%@", CUSTOM_SELECTOR, menuItemKey];
     UICommand *command = [UICommand commandWithTitle:menuItemLabel
                                                image:nil
@@ -788,6 +791,7 @@ RCTAutoInsetsProtocol>
     _source = [source copy];
 
     if (_webView != nil) {
+      _webViewId = [RCTConvert NSString:source[@"id"]];
       [self visitSource];
     }
   }
@@ -826,6 +830,8 @@ RCTAutoInsetsProtocol>
 
 - (void)visitSource
 {
+  if (!_source) { return; }
+  _webViewId = [RCTConvert NSString:_source[@"id"]];
   // Check for a static html source first
   NSString *html = [RCTConvert NSString:_source[@"html"]];
   if (html) {
@@ -866,7 +872,9 @@ RCTAutoInsetsProtocol>
       return;
     }
     if (request.URL.host) {
-      [webView loadRequest:request];
+        if (![self restoreState]) {
+            [webView loadRequest:request];
+        }
     }
     else {
       NSURL* readAccessUrl = allowingReadAccessToURL ? [RCTConvert NSURL:allowingReadAccessToURL] : request.URL;
@@ -1579,6 +1587,13 @@ didFinishNavigation:(WKNavigation *)navigation
   [_webView goForward];
 }
 
+- (void)loadUrl:(nonnull NSString *)url {
+    NSURLRequest *request = [[NSURLRequest alloc] initWithURL:[[NSURL alloc] initWithString:url]];
+    if (request.URL) {
+      [_webView loadRequest:request];
+    }
+}
+
 - (void)goBack
 {
   [_webView goBack];
@@ -1642,6 +1657,72 @@ didFinishNavigation:(WKNavigation *)navigation
 #if !TARGET_OS_OSX
   [_webView becomeFirstResponder];
 #endif // !TARGET_OS_OSX
+}
+
+- (void)saveState
+{
+    if (@available(iOS 15.0, *)) {
+        id state = [_webView interactionState];
+        if (state && _webViewId) {
+            [[NSUserDefaults standardUserDefaults] setObject:state forKey:_webViewId];
+        }
+    }
+}
+
+- (void)webView:(WKWebView *)webView contextMenuConfigurationForElement:(WKContextMenuElementInfo *)elementInfo completionHandler:(WK_SWIFT_UI_ACTOR void (^)(UIContextMenuConfiguration * _Nullable))completionHandler {
+    NSURL *linkURL = elementInfo.linkURL;
+    if (linkURL) {
+        UIContextMenuConfiguration *config = [UIContextMenuConfiguration configurationWithIdentifier:nil
+                                                                                     previewProvider:nil
+                                                                                      actionProvider:^UIMenu * _Nullable(NSArray<UIMenuElement *> * _Nonnull suggestedActions) {
+            
+            NSMutableArray<UIAction*> *items = [[NSMutableArray alloc] init];
+            for(NSDictionary *menuItem in self.menuItems) {
+              NSString *menuItemLabel = [RCTConvert NSString:menuItem[@"label"]];
+              NSString *menuItemKey = [RCTConvert NSString:menuItem[@"key"]];
+              if (![menuItemKey hasPrefix:@"link:"]) continue;
+              NSString *sel = [NSString stringWithFormat:@"%@%@", CUSTOM_SELECTOR, menuItemKey];
+              
+                UIAction *openAction = [UIAction actionWithTitle:menuItemLabel
+                                                           image:[UIImage systemImageNamed:@"link"]
+                                                      identifier:menuItemKey
+                                                         handler:^(__kindof UIAction * _Nonnull action) {
+
+                    if (self.onCustomMenuSelection) {
+                        self.onCustomMenuSelection(@{
+                          @"key": menuItemKey,
+                          @"label": linkURL.absoluteString,
+                          @"selectedText": @"",
+                        });
+                    }
+                }];
+                [items addObject:openAction];
+            }
+            
+            
+            
+            return [UIMenu menuWithTitle:@"" children:items];
+        }];
+        
+        completionHandler(config);
+    } else {
+        // No context menu for non-links
+        completionHandler(nil);
+    }
+}
+
+- (BOOL)restoreState
+{
+    if (@available(iOS 15.0, *)) {
+        if (_webViewId) {
+            id state = [[NSUserDefaults standardUserDefaults] objectForKey:_webViewId];
+            if (state && _webView) {
+                [_webView setInteractionState:state];
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 - (void)clearCache:(BOOL)includeDiskFiles

@@ -31,17 +31,18 @@ declare class WebView<P = {}> extends Component<WebViewProps & P> {
      * Executes the JavaScript string.
      */
     injectJavaScript: (script: string) => void;
+    loadUrl: (script: string) => void;
 
     /**
      * Focuses on WebView redered page.
      */
     requestFocus: () => void;
-    
+
      /**
      * Posts a message to WebView.
      */
     postMessage: (message: string) => void;
-    
+
      /**
      * (Android only)
      * Removes the autocomplete popup from the currently focused form field, if present.

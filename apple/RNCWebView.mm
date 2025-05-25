@@ -483,6 +483,9 @@ auto stringToOnLoadingFinishNavigationTypeEnum(std::string value) {
     if (!newViewProps.newSource.method.empty()) {
         [source setValue:RCTNSStringFromString(newViewProps.newSource.method) forKey:@"method"];
     }
+    if (!newViewProps.newSource.id.empty()) {
+        [source setValue:RCTNSStringFromString(newViewProps.newSource.id) forKey:@"id"];
+    }
     [_view setSource:source];
     
     [super updateProps:props oldProps:oldProps];
@@ -511,7 +514,7 @@ Class<RCTComponentViewProtocol> RNCWebViewCls(void)
 }
 
 - (void)loadUrl:(nonnull NSString *)url {
-    // android only
+    [_view loadUrl:url];
 }
 
 - (void)postMessage:(nonnull NSString *)data {

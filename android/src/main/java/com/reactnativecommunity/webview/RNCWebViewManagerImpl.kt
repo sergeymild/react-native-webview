@@ -386,6 +386,7 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
     private fun loadSource(viewWrapper: RNCWebViewWrapper, source: ReadableMap?) {
         val view = viewWrapper.webView
         if (source != null) {
+            view.setWebViewId(if (source.hasKey("id")) source.getString("id") else null);
             if (source.hasKey("html")) {
                 val html = source.getString("html")
                 val baseUrl = if (source.hasKey("baseUrl")) source.getString("baseUrl") else ""
@@ -399,11 +400,10 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
                 return
             }
             if (source.hasKey("uri")) {
+                if (view.restoreState()) return
                 val url = source.getString("uri")
                 val previousUrl = view.url
-                if (previousUrl != null && previousUrl == url) {
-                    return
-                }
+                if (previousUrl != null && previousUrl == url) return
                 if (source.hasKey("method")) {
                     val method = source.getString("method")
                     if (method.equals(HTTP_METHOD_POST, ignoreCase = true)) {

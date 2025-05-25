@@ -283,6 +283,7 @@ export interface NativeProps extends ViewProps {
   showsVerticalScrollIndicator?: WithDefault<boolean, true>;
   newSource: Readonly<{
     uri?: string;
+    id: string;
     method?: string;
     body?: string;
 

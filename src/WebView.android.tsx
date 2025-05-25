@@ -157,6 +157,7 @@ const WebViewComponent = forwardRef<{}, AndroidWebViewProps>(
         goForward: () =>
           webViewRef.current && Commands.goForward(webViewRef.current),
         goBack: () => webViewRef.current && Commands.goBack(webViewRef.current),
+        loadUrl: (url) => webViewRef.current && Commands.loadUrl(webViewRef.current, url),
         reload: () => {
           setViewState('LOADING');
           if (webViewRef.current) {

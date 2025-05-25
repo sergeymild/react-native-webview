@@ -17,6 +17,7 @@ import android.webkit.WebViewClient;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.util.Pair;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.facebook.common.logging.FLog;
 import com.facebook.react.bridge.Arguments;
@@ -58,17 +59,15 @@ public class RNCWebViewClient extends WebViewClient {
         super.onPageFinished(webView, url);
         String cookies = CookieManager.getInstance().getCookie(url);
         if (cookies != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                CookieManager.getInstance().flush();
-            }else {
-                CookieSyncManager.getInstance().sync();
-            }
+            CookieManager.getInstance().flush();
         }
+      ((SwipeRefreshLayout)webView.getParent()).setRefreshing(false);
 
         if (!mLastLoadFailed) {
             RNCWebView reactWebView = (RNCWebView) webView;
 
             reactWebView.callInjectedJavaScript();
+            reactWebView.saveState();
 
             emitFinishEvent(webView, url);
         }

@@ -1,9 +1,14 @@
 package com.reactnativecommunity.webview;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.Bundle;
+import android.os.Parcel;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.ActionMode;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -17,6 +22,7 @@ import android.webkit.WebViewClient;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebViewCompat;
@@ -44,6 +50,7 @@ import com.reactnativecommunity.webview.events.TopMessageEvent;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,6 +85,31 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
     protected boolean hasScrollEvent = false;
     protected boolean nestedScrollEnabled = false;
     protected ProgressChangedFilter progressChangedFilter;
+    @Nullable
+    public String webViewId;
+    int hitTestType = -1;
+
+    private void showCenteredMenu(Context context, String url) {
+      AlertDialog.Builder builder = new AlertDialog.Builder(context);
+
+      ArrayList<String> options = new ArrayList<>();
+      for (int i = 0; i < menuCustomItems.size(); i++) {
+        if (menuCustomItems.get(i).get("key").startsWith("link:")) continue;
+        options.add(menuCustomItems.get(i).get("label"));
+      }
+      if (options.isEmpty()) return;
+      String[] array = options.toArray(new String[0]);
+      builder.setItems(array, (dialog, which) -> {
+
+        Map<String, String> menuItemMap = menuCustomItems.get(which);
+        WritableMap wMap = Arguments.createMap();
+        wMap.putString("label", url);
+        wMap.putString("key", menuItemMap.get("key"));
+        dispatchEvent(RNCWebView.this, new TopCustomMenuSelectionEvent(RNCWebViewWrapper.getReactTagFromWebView(RNCWebView.this), wMap));
+      });
+
+      builder.show();
+    }
 
     /**
      * WebView must be created with an context of the current activity
@@ -89,6 +121,16 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         super(reactContext);
         mMessagingJSModule = ((ThemedReactContext) this.getContext()).getReactApplicationContext().getJSModule(RNCWebViewMessagingModule.class);
         progressChangedFilter = new ProgressChangedFilter();
+        setOnLongClickListener(v -> {
+          WebView.HitTestResult result = getHitTestResult();
+          hitTestType = result.getType();
+          if (result.getType() == HitTestResult.SRC_ANCHOR_TYPE || result.getType() == HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+            String url = result.getExtra();
+            showCenteredMenu(reactContext, url);
+            return true;
+          }
+          return false;
+        });
     }
 
     public void setIgnoreErrFailedForThisURL(String url) {
@@ -159,7 +201,7 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
 
     @Override
     public ActionMode startActionMode(ActionMode.Callback callback, int type) {
-      if(menuCustomItems == null ){
+      if(menuCustomItems == null || hitTestType == HitTestResult.EDIT_TEXT_TYPE) {
         return super.startActionMode(callback, type);
       }
 
@@ -195,6 +237,8 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
                 wMap.putString("selectedText", selectionText);
                 dispatchEvent(RNCWebView.this, new TopCustomMenuSelectionEvent(RNCWebViewWrapper.getReactTagFromWebView(RNCWebView.this), wMap));
                 mode.finish();
+
+                evaluateJavascript("(function() { window.getSelection().removeAllRanges(); })();", null);
               }
             }
           );
@@ -468,5 +512,68 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         public boolean isWaitingForCommandLoadUrl() {
             return waitingForCommandLoadUrl;
         }
+    }
+
+    public void setWebViewId(String id) {
+      this.webViewId = id;
+      System.out.println("🐣 setId " + webViewId);
+    }
+
+    public boolean restoreState() {
+      if (this.webViewId == null) return false;
+      Bundle bundle = BundlePreferencesUtil.restoreBundleFromPreferences(getContext(), webViewId);
+      if (bundle == null) return false;
+      System.out.println("🐣 restoredState " + webViewId);
+      return this.restoreState(bundle) != null;
+    }
+
+    public void saveState() {
+      if (this.webViewId == null) return;
+      Bundle bundle = new Bundle();
+      if (this.saveState(bundle) != null) {
+        BundlePreferencesUtil.saveBundleToPreferences(bundle, getContext(), webViewId);
+        System.out.println("🐣 savedState " + webViewId);
+      }
+    }
+
+    private static class BundlePreferencesUtil {
+
+      public static void saveBundleToPreferences(Bundle bundle, Context context, String key) {
+        SharedPreferences sharedPreferences = context.getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
+        Parcel parcel = Parcel.obtain();
+        try {
+          // Serialize the Bundle into a Parcel
+          bundle.writeToParcel(parcel, 0);
+          byte[] bytes = parcel.marshall();
+          String encodedString = Base64.encodeToString(bytes, Base64.DEFAULT);
+
+          // Save the encoded string in SharedPreferences
+          sharedPreferences.edit().putString(key, encodedString).apply();
+        } finally {
+          parcel.recycle();
+        }
+      }
+
+      public static Bundle restoreBundleFromPreferences(Context context, String key) {
+        SharedPreferences sharedPreferences = context.getSharedPreferences("MyPrefs", Context.MODE_PRIVATE);
+        String encodedString = sharedPreferences.getString(key, null);
+
+        if (encodedString == null) {
+          return null;
+        }
+
+        byte[] bytes = Base64.decode(encodedString, Base64.DEFAULT);
+        Parcel parcel = Parcel.obtain();
+        try {
+          // Deserialize the byte array into a Parcel
+          parcel.unmarshall(bytes, 0, bytes.length);
+          parcel.setDataPosition(0);
+
+          // Create and return the Bundle from the Parcel
+          return Bundle.CREATOR.createFromParcel(parcel);
+        } finally {
+          parcel.recycle();
+        }
+      }
     }
 }

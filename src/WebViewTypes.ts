@@ -187,6 +187,7 @@ export interface WebViewSourceUri {
    * The URI to load in the `WebView`. Can be a local or remote file.
    */
   uri: string;
+  id: string;
 
   /**
    * The HTTP Method to use. Defaults to GET if not specified.

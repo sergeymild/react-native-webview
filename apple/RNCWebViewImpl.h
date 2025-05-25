@@ -105,6 +105,7 @@ shouldStartLoadForRequest:(NSMutableDictionary<NSString *, id> *)request
 @property (nonatomic, assign) BOOL directionalLockEnabled;
 @property (nonatomic, assign) BOOL ignoreSilentHardwareSwitch;
 @property (nonatomic, copy) NSString * _Nullable allowingReadAccessToURL;
+@property (nonatomic, copy) NSString * _Nullable webViewId;
 @property (nonatomic, copy) NSDictionary * _Nullable basicAuthCredential;
 @property (nonatomic, assign) BOOL pullToRefreshEnabled;
 @property (nonatomic, assign) BOOL refreshControlLightMode;
@@ -143,10 +144,12 @@ shouldStartLoadForRequest:(NSMutableDictionary<NSString *, id> *)request
 - (void)postMessage:(NSString *_Nullable)message;
 - (void)injectJavaScript:(NSString *_Nullable)script;
 - (void)goForward;
+- (void)loadUrl:(NSString *)url;
 - (void)goBack;
 - (void)reload;
 - (void)stopLoading;
 - (void)requestFocus;
+- (void)saveState;
 - (void)clearCache:(BOOL)includeDiskFiles;
 #ifdef RCT_NEW_ARCH_ENABLED
 - (void)destroyWebView;
