@@ -29,31 +29,39 @@ class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(con
     refresh.addView(webView)
     addView(refresh)
     refresh.setOnRefreshListener { webView.reload() }
+    refresh.isEnabled = false
 
     var downX = 0f
     var downY = 0f
     val touchSlop = ViewConfiguration.get(webView.context).scaledTouchSlop
 
-    webView.setOnTouchListener { _, event ->
+    webView.setOnTouchListener { v, event ->
       when (event.action) {
         MotionEvent.ACTION_DOWN -> {
           downX = event.x
           downY = event.y
-          refresh.isEnabled = true // Assume vertical until proven otherwise
+          //refresh.isEnabled = true // Assume vertical until proven otherwise
+          v.parent.requestDisallowInterceptTouchEvent(false)
         }
 
         MotionEvent.ACTION_MOVE -> {
           val deltaX = Math.abs(event.x - downX)
           val deltaY = Math.abs(event.y - downY)
 
-          // If the user is scrolling more horizontally than vertically
-          if (deltaX > touchSlop && deltaX > deltaY) {
-            refresh.isEnabled = false
+          if (deltaY > touchSlop && deltaY > deltaX) {
+            if (webView.canScrollVertically(-1)) {
+              // WebView может скроллиться вверх => вложенный скролл
+              v.parent.requestDisallowInterceptTouchEvent(true)
+            } else {
+              // WebView уже на самом верху => разрешаем SwipeRefresh
+              v.parent.requestDisallowInterceptTouchEvent(false)
+            }
           }
         }
 
         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-          refresh.isEnabled = true
+//          refresh.isEnabled = true
+          v.parent.requestDisallowInterceptTouchEvent(false)
         }
       }
       false
