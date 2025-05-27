@@ -23,6 +23,7 @@ import android.webkit.WebViewClient;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.webkit.JavaScriptReplyProxy;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebViewCompat;
@@ -347,11 +348,47 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         evaluateJavascript(script, null);
     }
 
+  String js = "(function() {"
+    + "function isScrollable(el) {"
+    + "  var style = getComputedStyle(el);"
+    + "  return ("
+    + "    (style.overflowY === 'auto' || style.overflowY === 'scroll') &&"
+    + "    el.scrollHeight > el.clientHeight"
+    + "  );"
+    + "}"
+    + "function addListeners(el) {"
+    + "  el.addEventListener('touchstart', function() {"
+    + "    window.ReactNativeWebView && window.ReactNativeWebView.postMessage('disable_refresh');"
+    + "  });"
+    + "  el.addEventListener('touchend', function() {"
+    + "    window.ReactNativeWebView && window.ReactNativeWebView.postMessage('enable_refresh');"
+    + "  });"
+    + "}"
+    + "Array.from(document.querySelectorAll('*')).forEach(function(el) {"
+    + "  if (isScrollable(el)) addListeners(el);"
+    + "});"
+    + "var observer = new MutationObserver(function(mutations) {"
+    + "  mutations.forEach(function(mutation) {"
+    + "    mutation.addedNodes.forEach(function(node) {"
+    + "      if (node.nodeType === 1) {"
+    + "        var el = node;"
+    + "        if (isScrollable(el)) addListeners(el);"
+    + "        Array.from(el.querySelectorAll('*')).forEach(function(child) {"
+    + "          if (isScrollable(child)) addListeners(child);"
+    + "        });"
+    + "      }"
+    + "    });"
+    + "  });"
+    + "});"
+    + "observer.observe(document.body, { childList: true, subtree: true });"
+    + "})();";
+
     public void callInjectedJavaScript() {
         if (getSettings().getJavaScriptEnabled() &&
                 injectedJS != null &&
                 !TextUtils.isEmpty(injectedJS)) {
             evaluateJavascriptWithFallback("(function() {\n" + injectedJS + ";\n})();");
+            evaluateJavascriptWithFallback(js);
             injectJavascriptObject(); // re-inject the Javascript object in case it has been overwritten.
         }
     }
@@ -381,17 +418,23 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
             webView.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (mRNCWebViewClient == null) {
-                        return;
-                    }
+                    if (mRNCWebViewClient == null) return;
+
+                  if (message.contains("disable_refresh")) {
+                    ((SwipeRefreshLayout) mWebView.getParent()).setEnabled(false);
+                    //swipeRefresh.setEnabled(false);
+                  } else if (message.contains("enable_refresh")) {
+                    ((SwipeRefreshLayout) mWebView.getParent()).setEnabled(true);
+                  } else {
                     WritableMap data = mRNCWebViewClient.createWebViewEvent(webView, sourceUrl);
                     data.putString("data", message);
 
                     if (mMessagingJSModule != null) {
-                        dispatchDirectMessage(data);
+                      dispatchDirectMessage(data);
                     } else {
-                        dispatchEvent(webView, new TopMessageEvent(RNCWebViewWrapper.getReactTagFromWebView(webView), data));
+                      dispatchEvent(webView, new TopMessageEvent(RNCWebViewWrapper.getReactTagFromWebView(webView), data));
                     }
+                  }
                 }
             });
         } else {
@@ -493,8 +536,16 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         @JavascriptInterface
         public void postMessage(String message) {
             if (mWebView.getMessagingEnabled()) {
+              if (message.contains("disable_refresh")) {
+                ((SwipeRefreshLayout) mWebView.getParent()).setRefreshing(false);
+                //swipeRefresh.setEnabled(false);
+              } else if (message.contains("enable_refresh")) {
+                ((SwipeRefreshLayout) mWebView.getParent()).setRefreshing(true);
+              } else {
                 // Post to main thread because `mWebView.getUrl()` requires to be executed on main.
                 mWebView.post(() -> mWebView.onMessage(message, mWebView.getUrl()));
+              }
+
             } else {
                 FLog.w(TAG, "ReactNativeWebView.postMessage method was called but messaging is disabled. Pass an onMessage handler to the WebView.");
             }

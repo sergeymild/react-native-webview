@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.ViewParent
 import android.webkit.WebView
 import android.widget.FrameLayout
+import androidx.core.view.children
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 /**
@@ -35,37 +36,30 @@ class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(con
     var downY = 0f
     val touchSlop = ViewConfiguration.get(webView.context).scaledTouchSlop
 
-    webView.setOnTouchListener { v, event ->
-      when (event.action) {
-        MotionEvent.ACTION_DOWN -> {
-          downX = event.x
-          downY = event.y
-          //refresh.isEnabled = true // Assume vertical until proven otherwise
-          v.parent.requestDisallowInterceptTouchEvent(false)
-        }
-
-        MotionEvent.ACTION_MOVE -> {
-          val deltaX = Math.abs(event.x - downX)
-          val deltaY = Math.abs(event.y - downY)
-
-          if (deltaY > touchSlop && deltaY > deltaX) {
-            if (webView.canScrollVertically(-1)) {
-              // WebView может скроллиться вверх => вложенный скролл
-              v.parent.requestDisallowInterceptTouchEvent(true)
-            } else {
-              // WebView уже на самом верху => разрешаем SwipeRefresh
-              v.parent.requestDisallowInterceptTouchEvent(false)
-            }
-          }
-        }
-
-        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+//    webView.setOnTouchListener { _, event ->
+//      when (event.action) {
+//        MotionEvent.ACTION_DOWN -> {
+//          downX = event.x
+//          downY = event.y
+//          refresh.isEnabled = true // Assume vertical until proven otherwise
+//        }
+//
+//        MotionEvent.ACTION_MOVE -> {
+//          val deltaX = Math.abs(event.x - downX)
+//          val deltaY = Math.abs(event.y - downY)
+//
+//          // If the user is scrolling more horizontally than vertically
+//          if (deltaX > touchSlop && deltaX > deltaY) {
+//            refresh.isEnabled = false
+//          }
+//        }
+//
+//        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
 //          refresh.isEnabled = true
-          v.parent.requestDisallowInterceptTouchEvent(false)
-        }
-      }
-      false
-    }
+//        }
+//      }
+//      false
+//    }
   }
 
   val webView: RNCWebView
