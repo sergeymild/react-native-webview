@@ -1,6 +1,8 @@
 package com.reactnativecommunity.webview
 
 import android.app.DownloadManager
+import android.content.ActivityNotFoundException
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -9,6 +11,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.view.View
@@ -18,6 +21,8 @@ import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -75,10 +80,10 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
       return createViewInstance(context, webView);
     }
 
-  fun saveDataUriToDownloads(context: Context, dataUri: String): Uri? {
+  private fun saveDataUriToDownloads(context: Context, dataUri: String) {
     try {
       val regex = Regex("^data:([^;]+);base64,(.+)$")
-      val match = regex.find(dataUri) ?: return null
+      val match = regex.find(dataUri) ?: return
 
       val mimeType = match.groupValues[1]
       val base64Data = match.groupValues[2]
@@ -99,25 +104,27 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
       // Раскодируем base64
       val fileBytes = Base64.decode(base64Data, Base64.DEFAULT)
 
-      // Сохраняем в папку Загрузки
-      val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-      val file = File(downloadsDir, fileName)
-      file.writeBytes(fileBytes)
+      val contentResolver = context.contentResolver
+      val contentValues = ContentValues().apply {
+        put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+        put(MediaStore.Downloads.MIME_TYPE, mimeType)
+        put(MediaStore.Downloads.IS_PENDING, 1)
+      }
+      val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+      uri?.let {
+        contentResolver.openOutputStream(it)?.use { outputStream ->
+          outputStream.write(fileBytes)
+        }
 
-      // Получаем Uri через FileProvider
-      val uri = FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        file
-      )
+        contentValues.clear()
+        contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+        contentResolver.update(uri, contentValues, null, null)
+      }
 
-      // Уведомим систему
-      context.sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, uri))
-
-      return uri
+      return
     } catch (e: Exception) {
       e.printStackTrace()
-      return null
+      return
     }
   }
 
