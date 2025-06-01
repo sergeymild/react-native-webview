@@ -1419,6 +1419,66 @@ RCTAutoInsetsProtocol>
   }
 }
 
+- (BOOL)saveBase64DataURLToFiles:(NSString *)dataURL {
+    // 1. Проверяем, что это data-URL
+    if (![dataURL hasPrefix:@"data:"]) {
+        return false;
+    }
+
+    // 2. Разбиваем строку
+    NSArray *components = [dataURL componentsSeparatedByString:@","];
+    if (components.count != 2) {
+        return false;
+    }
+
+    NSString *metaPart = components[0]; // e.g., data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64
+    NSString *base64String = components[1];
+
+    // 3. Получаем MIME-тип
+    NSString *mimeType = nil;
+    NSScanner *scanner = [NSScanner scannerWithString:metaPart];
+    [scanner scanString:@"data:" intoString:nil];
+    [scanner scanUpToString:@";" intoString:&mimeType];
+
+    // 4. Декодируем base64
+    NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:base64String options:0];
+    if (!decodedData) {
+        return false;
+    }
+
+    // 5. Создаем имя файла по MIME-типу
+    NSString *extension = [self fileExtensionForMimeType:mimeType];
+    
+    NSData *fileData = [[NSData alloc] initWithBase64EncodedString:base64String options:0];
+    if (!fileData) return false;
+    
+    // Временный файл
+    NSString *fileName = [NSString stringWithFormat:@"ExportedFile.%@", extension];
+    NSURL *tempURL = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:fileName]];
+    [fileData writeToURL:tempURL atomically:YES];
+    
+    // UIActivityViewController — позволяет сохранить в "Файлы"
+    UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:@[tempURL] applicationActivities:nil];
+    
+    // Показываем
+    UIViewController *rootVC = RCTPresentedViewController();
+    [rootVC presentViewController:activityVC animated:YES completion:nil];
+
+    return true;
+}
+
+// Вспомогательная функция — расширение по MIME-типу
+- (NSString *)fileExtensionForMimeType:(NSString *)mimeType {
+    if ([mimeType isEqualToString:@"application/pdf"]) return @"pdf";
+    if ([mimeType isEqualToString:@"application/zip"]) return @"zip";
+    if ([mimeType isEqualToString:@"text/plain"]) return @"txt";
+    if ([mimeType isEqualToString:@"application/msword"]) return @"doc";
+    if ([mimeType isEqualToString:@"application/vnd.openxmlformats-officedocument.wordprocessingml.document"]) return @"docx";
+    if ([mimeType isEqualToString:@"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]) return @"xlsx";
+    // по умолчанию
+    return @"bin";
+}
+
 /**
  * Decides whether to allow or cancel a navigation after its response is known.
  * @see https://developer.apple.com/documentation/webkit/wknavigationdelegate/1455643-webview?language=objc
@@ -1428,6 +1488,10 @@ RCTAutoInsetsProtocol>
                     decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler
 {
   WKNavigationResponsePolicy policy = WKNavigationResponsePolicyAllow;
+    if ([navigationResponse.response isKindOfClass:[NSURLResponse class]]) {
+        NSURLResponse *response = (NSURLResponse *)navigationResponse.response;
+        [self saveBase64DataURLToFiles:response.URL.absoluteString];
+    }
   if ([navigationResponse.response isKindOfClass:[NSHTTPURLResponse class]]) {
     NSHTTPURLResponse *response = (NSHTTPURLResponse *)navigationResponse.response;
     NSInteger statusCode = response.statusCode;
@@ -1561,6 +1625,7 @@ didFinishNavigation:(WKNavigation *)navigation
   if (_onLoadingFinish) {
     _onLoadingFinish([self baseEvent]);
   }
+    [self saveState];
 }
 
 - (void)cookiesDidChangeInCookieStore:(WKHTTPCookieStore *)cookieStore
