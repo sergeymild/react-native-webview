@@ -82,11 +82,12 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
 
   private fun saveDataUriToDownloads(context: Context, dataUri: String) {
     try {
-      val regex = Regex("^data:([^;]+);base64,(.+)$")
+      val regex = Regex("^data:([^;]+)(;name=([^;]+))?;base64,(.+)$")
       val match = regex.find(dataUri) ?: return
 
       val mimeType = match.groupValues[1]
-      val base64Data = match.groupValues[2]
+      val base64Data = match.groupValues[4]
+      val optionalFileName = match.groupValues[3]
 
       // Определяем расширение по MIME
       val extension = when (mimeType) {
@@ -98,8 +99,13 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
       }
 
       // Генерируем имя файла
-      val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-      val fileName = "file_$timeStamp.$extension"
+      // Имя файла: либо из `name=...`, либо сгенерировать
+      val fileName = if (optionalFileName.isNotBlank()) {
+        "$optionalFileName.$extension"
+      } else {
+        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        "file_$timeStamp.$extension"
+      }
 
       // Раскодируем base64
       val fileBytes = Base64.decode(base64Data, Base64.DEFAULT)
