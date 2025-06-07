@@ -3,4 +3,5 @@
   <external-path
     name="shared"
     path="." />
+  <external-path name="downloads" path="Download/" />
 </paths>

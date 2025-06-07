@@ -1,11 +1,16 @@
 package com.reactnativecommunity.webview
 
+import android.Manifest
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
@@ -22,7 +27,10 @@ import android.webkit.DownloadListener
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -30,6 +38,8 @@ import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.common.MapBuilder
 import com.facebook.react.common.build.ReactBuildConfig
+import com.facebook.react.modules.core.PermissionAwareActivity
+import com.facebook.react.modules.core.PermissionListener
 import com.facebook.react.uimanager.ThemedReactContext
 import org.json.JSONException
 import org.json.JSONObject
@@ -80,6 +90,41 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
       return createViewInstance(context, webView);
     }
 
+  var id = 0
+  fun showDownloadNotification(context: Context, fileUri: Uri, mimeType: String, filename: String) {
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+      setDataAndType(fileUri, mimeType)
+      flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+    }
+
+    val pendingIntent = PendingIntent.getActivity(
+      context,
+      0,
+      intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val channelId = "downloads_channel"
+    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val channel = NotificationChannel(
+      channelId,
+      filename,
+      NotificationManager.IMPORTANCE_HIGH
+    )
+    notificationManager.createNotificationChannel(channel)
+
+    val notification = NotificationCompat.Builder(context, channelId)
+      .setContentTitle("Download complete")
+      .setContentText("Tap to open the $filename")
+      .setSmallIcon(android.R.drawable.stat_sys_download_done)
+      .setContentIntent(pendingIntent)
+      .setAutoCancel(true)
+      .setGroup("com.example.DOWNLOAD_GROUP")
+      .build()
+
+    notificationManager.notify(++id, notification)
+  }
+
   private fun saveDataUriToDownloads(context: Context, dataUri: String) {
     try {
       val regex = Regex("^data:([^;]+)(;name=([^;]+))?;base64,(.+)$")
@@ -126,7 +171,17 @@ class RNCWebViewManagerImpl(private val newArch: Boolean = false) {
         contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
         contentResolver.update(uri, contentValues, null, null)
       }
-
+      uri?.let {
+        val appCompatActivity = (context as ThemedReactContext).currentActivity as PermissionAwareActivity
+        appCompatActivity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),2000,
+          PermissionListener { requestCode, permissions, grantResults ->
+            if (requestCode !== 2000) return@PermissionListener false
+            if (grantResults.find { it == PackageManager.PERMISSION_GRANTED } != null) {
+              showDownloadNotification(context, it, mimeType, fileName)
+            }
+            return@PermissionListener true
+          })
+      }
       return
     } catch (e: Exception) {
       e.printStackTrace()
