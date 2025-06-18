@@ -95,7 +95,7 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
 
       ArrayList<String> options = new ArrayList<>();
       for (int i = 0; i < menuCustomItems.size(); i++) {
-        if (menuCustomItems.get(i).get("key").startsWith("link:")) continue;
+        if (!menuCustomItems.get(i).get("key").startsWith("link:")) continue;
         options.add(menuCustomItems.get(i).get("label"));
       }
       if (options.isEmpty()) return;
@@ -125,6 +125,9 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         setOnLongClickListener(v -> {
           WebView.HitTestResult result = getHitTestResult();
           hitTestType = result.getType();
+          if (hitTestType == HitTestResult.UNKNOWN_TYPE && result.getExtra() == null) {
+            hitTestType = HitTestResult.EDIT_TEXT_TYPE;
+          }
           if (result.getType() == HitTestResult.SRC_ANCHOR_TYPE || result.getType() == HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
             String url = result.getExtra();
             showCenteredMenu(reactContext, url);
@@ -193,8 +196,8 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         }
     }
 
-    protected @Nullable
-    List<Map<String, String>> menuCustomItems;
+  @Nullable
+  private List<Map<String, String>> menuCustomItems;
 
     public void setMenuCustomItems(List<Map<String, String>> menuCustomItems) {
       this.menuCustomItems = menuCustomItems;
