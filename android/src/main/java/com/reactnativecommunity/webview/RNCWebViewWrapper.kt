@@ -30,36 +30,35 @@ class RNCWebViewWrapper(context: Context, webView: RNCWebView) : FrameLayout(con
     refresh.addView(webView)
     addView(refresh)
     refresh.setOnRefreshListener { webView.reload() }
-    refresh.isEnabled = false
 
     var downX = 0f
     var downY = 0f
     val touchSlop = ViewConfiguration.get(webView.context).scaledTouchSlop
 
-//    webView.setOnTouchListener { _, event ->
-//      when (event.action) {
-//        MotionEvent.ACTION_DOWN -> {
-//          downX = event.x
-//          downY = event.y
-//          refresh.isEnabled = true // Assume vertical until proven otherwise
-//        }
-//
-//        MotionEvent.ACTION_MOVE -> {
-//          val deltaX = Math.abs(event.x - downX)
-//          val deltaY = Math.abs(event.y - downY)
-//
-//          // If the user is scrolling more horizontally than vertically
-//          if (deltaX > touchSlop && deltaX > deltaY) {
-//            refresh.isEnabled = false
-//          }
-//        }
-//
-//        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-//          refresh.isEnabled = true
-//        }
-//      }
-//      false
-//    }
+    webView.setOnTouchListener { _, event ->
+      when (event.action) {
+        MotionEvent.ACTION_DOWN -> {
+          downX = event.x
+          downY = event.y
+          refresh.isEnabled = true // Assume vertical until proven otherwise
+        }
+
+        MotionEvent.ACTION_MOVE -> {
+          val deltaX = Math.abs(event.x - downX)
+          val deltaY = Math.abs(event.y - downY)
+
+          // If the user is scrolling more horizontally than vertically
+          if (deltaX > touchSlop && deltaX > deltaY) {
+            refresh.isEnabled = false
+          }
+        }
+
+        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+          refresh.isEnabled = true
+        }
+      }
+      false
+    }
   }
 
   val webView: RNCWebView

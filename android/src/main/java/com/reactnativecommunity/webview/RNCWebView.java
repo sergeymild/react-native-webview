@@ -351,40 +351,71 @@ public class RNCWebView extends WebView implements LifecycleEventListener {
         evaluateJavascript(script, null);
     }
 
-  String js = "(function() {"
-    + "function isScrollable(el) {"
-    + "  var style = getComputedStyle(el);"
-    + "  return ("
-    + "    (style.overflowY === 'auto' || style.overflowY === 'scroll') &&"
-    + "    el.scrollHeight > el.clientHeight"
-    + "  );"
-    + "}"
-    + "function addListeners(el) {"
-    + "  el.addEventListener('touchstart', function() {"
-    + "    window.ReactNativeWebView && window.ReactNativeWebView.postMessage('disable_refresh');"
-    + "  });"
-    + "  el.addEventListener('touchend', function() {"
-    + "    window.ReactNativeWebView && window.ReactNativeWebView.postMessage('enable_refresh');"
-    + "  });"
-    + "}"
-    + "Array.from(document.querySelectorAll('*')).forEach(function(el) {"
-    + "  if (isScrollable(el)) addListeners(el);"
-    + "});"
-    + "var observer = new MutationObserver(function(mutations) {"
-    + "  mutations.forEach(function(mutation) {"
-    + "    mutation.addedNodes.forEach(function(node) {"
-    + "      if (node.nodeType === 1) {"
-    + "        var el = node;"
-    + "        if (isScrollable(el)) addListeners(el);"
-    + "        Array.from(el.querySelectorAll('*')).forEach(function(child) {"
-    + "          if (isScrollable(child)) addListeners(child);"
-    + "        });"
-    + "      }"
-    + "    });"
-    + "  });"
-    + "});"
-    + "observer.observe(document.body, { childList: true, subtree: true });"
-    + "})();";
+  String js = "(function () {\n" +
+    "  function isScrollable(el) {\n" +
+    "    const style = getComputedStyle(el);\n" +
+    "    const overflowY = style.overflowY;\n" +
+    "    const scrollable =\n" +
+    "      (overflowY === 'auto' || overflowY === 'scroll') &&\n" +
+    "      el.scrollHeight > el.clientHeight;\n" +
+    "    if (scrollable) {\n" +
+    "      console.log('[scrollable] Found scrollable:', el);\n" +
+    "    }\n" +
+    "    return scrollable;\n" +
+    "  }\n" +
+    "\n" +
+    "  function isRootScroll(el) {\n" +
+    "    return el === document.body || el === document.documentElement;\n" +
+    "  }\n" +
+    "\n" +
+    "  function addListeners(el) {\n" +
+    "    if (isRootScroll(el)) {\n" +
+    "      console.log('[skip] Root scroll element:', el);\n" +
+    "      return;\n" +
+    "    }\n" +
+    "\n" +
+    "    if (el._rnListenersAttached) return;\n" +
+    "    el._rnListenersAttached = true;\n" +
+    "\n" +
+    "    console.log('[listener] Adding listeners to:', el);\n" +
+    "\n" +
+    "    el.addEventListener('touchstart', (e) => {\n" +
+    "      // Only disable refresh if the scroll is NOT at the top\n" +
+    "      if (el.scrollTop > 0) {\n" +
+    "        console.log('[event] touchstart (scrollTop > 0) → disable_refresh');\n" +
+    "        window.ReactNativeWebView?.postMessage('disable_refresh');\n" +
+    "      } else {\n" +
+    "        console.log('[event] touchstart (scrollTop == 0) → allow swipe refresh');\n" +
+    "      }\n" +
+    "    });\n" +
+    "\n" +
+    "    el.addEventListener('touchend', () => {\n" +
+    "      console.log('[event] touchend → enable_refresh');\n" +
+    "      window.ReactNativeWebView?.postMessage('enable_refresh');\n" +
+    "    });\n" +
+    "  }\n" +
+    "\n" +
+    "  function processElement(el) {\n" +
+    "    if (isScrollable(el)) {\n" +
+    "      addListeners(el);\n" +
+    "    }\n" +
+    "  }\n" +
+    "\n" +
+    "  Array.from(document.querySelectorAll('*')).forEach(processElement);\n" +
+    "\n" +
+    "  const observer = new MutationObserver((mutations) => {\n" +
+    "    mutations.forEach((mutation) => {\n" +
+    "      mutation.addedNodes.forEach((node) => {\n" +
+    "        if (node.nodeType !== 1) return;\n" +
+    "        processElement(node);\n" +
+    "        node.querySelectorAll?.('*').forEach(processElement);\n" +
+    "      });\n" +
+    "    });\n" +
+    "  });\n" +
+    "\n" +
+    "  observer.observe(document.body, { childList: true, subtree: true });\n" +
+    "  console.log('[init] MutationObserver started');\n" +
+    "})();\n";
 
     public void callInjectedJavaScript() {
         if (getSettings().getJavaScriptEnabled() &&
